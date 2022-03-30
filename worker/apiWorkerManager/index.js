@@ -1,17 +1,26 @@
 const { Worker } = require("worker_threads");
-const { BroadcastChannel } = require('broadcast-channel');
-const dcaBotManager = (require('../dcaWorkerManager/index')).getInstance();
+const botService = require("./sevices/bot.service");
 
 class ApiWorkerManager {
     #workers = [];
 
-    createWorker(key, secret) {
+    createWorker(key, secret, botId, deposit) {
         return new Promise((resolve, reject) => {
             try {
                 const worker = new Worker("./worker/apiWorkerManager/worker.js", { workerData: { key, secret } });
 
-                worker.on("message", (data) => {
+                worker.on("message", async (data) => {
                     switch (data.type) {
+                        case "BOT_CONFIG":
+                            const botConfiguration = await botService.getBotConfiguration(data.pair, key, secret);
+
+                            if (typeof botConfiguration === 'undefined') { return; }
+
+                            worker.postMessage({
+                                type: "NEW_BOT",
+                                ...botConfiguration
+                            });
+                            break;
                         case "TERMINATE":
                             worker.terminate();
                             break;
@@ -42,29 +51,29 @@ class ApiWorkerManager {
     }
 
     deleteWorker(key, secret) {
-        const workerInfo = this.#workers.find(data => data.key == key && data.secret == secret);
-
-        if (typeof workerInfo === 'undefined') return;
-
-        workerInfo.worker.postMessage({ close: true });
-    }
-
-    checkAPI(key, secret) {
         return new Promise((resolve, reject) => {
             try {
-                let isApiExists = false;
+                const workerInfo = this.#workers.find(data => data.key == key && data.secret == secret);
 
-                this.#workers.forEach(workerInfo => {
-                    if (workerInfo.key == key && workerInfo.secret == secret) {
-                        isApiExists = true;
-                    }
-                });
+                if (typeof workerInfo === 'undefined') reject(new Error("API Listener worker undefined"));
 
-                resolve(isApiExists);
+                workerInfo.worker.postMessage({ close: true });
+
+                const workerIndex = this.#workers.indexOf(workerInfo);
+                if (workerIndex > -1) {
+                    this.#workers.splice(workerIndex, 1);
+                }
+
+                resolve();
             } catch (err) {
                 reject(err);
             }
         });
+    }
+
+    checkAPI(key, secret) {
+        const worker = this.#workers.find(info => info.key == key && info.secret == secret);
+        return typeof worker !== "undefined"
     }
 
     getChannel(key, secret) {
@@ -84,4 +93,4 @@ class Singleton {
     }
 }
 
-module.exports = Singleton;
+module.exports = Singleton.getInstance();

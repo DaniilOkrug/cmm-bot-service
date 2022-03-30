@@ -6,5 +6,8 @@ const router = new Router();
 router.post('/start', botController.start);
 router.post('/delete', botController.delete);
 router.post('/stop', botController.stop);
+router.post('/check', botController.check);
+router.get('/updateSettings', botController.updateSettings);
+router.get('/pairs', botController.getPairs)
 
 module.exports = router;

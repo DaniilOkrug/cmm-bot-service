@@ -1,4 +1,3 @@
-const res = require('express/lib/response');
 const Binance = require('node-binance-api');
 
 module.exports = class Analyzer {
@@ -6,10 +5,9 @@ module.exports = class Analyzer {
 
     constructor(options) {
         this.options = options;
-        // console.log(this.options);
     }
 
-    getSignal() {
+    getSignal(pair) {
         return new Promise(async (resolve, reject) => {
             try {
                 this.binance = new Binance().options({
@@ -69,18 +67,10 @@ module.exports = class Analyzer {
                 }
 
                 //Analyze intervals
-                
-                const signal = await this.checkIntervals(limit);
 
-                if (signal) {
-                    resolve();
-                } else {
-                    setInterval(async () => {
-                        const signal = await this.checkIntervals(limit);
+                const signal = await this.checkIntervals(limit, pair);
 
-                        if (signal) resolve();
-                    }, 120000)
-                }
+                resolve(signal);
             } catch (err) {
                 console.error(err);
             }
@@ -105,25 +95,25 @@ module.exports = class Analyzer {
         })
     }
 
-    checkIntervals(limit) {
+    checkIntervals(limit, pair) {
         return new Promise(async (resolve, reject) => {
             try {
-                console.log(`[${this.options.pair}] Analyzer: Check intervals`);
+                // console.log(`[${pair}] Analyzer: Check intervals`);
 
                 let priceChanges = 0;
 
                 //Calculate price changes
                 if (this.options.minPriceChangeNumber > 0) {
-                    const ticks = await this.binance.candlesticks(this.options.pair, this.options.interval, false, { limit: limit });
+                    const ticks = await this.binance.candlesticks(pair, this.options.interval, false, { limit: limit });
 
                     priceChanges = await this.calculatePriceChanges(ticks);
                 }
 
-                console.log('Price changes: ' + priceChanges);
+                // console.log('Price changes: ' + priceChanges);
 
                 if (this.options.minVolume > 0) {
                     new Promise(() => {
-                        this.binance.prevDay(this.options.pair, (error, prevDay, symbol) => {
+                        this.binance.prevDay(pair, (error, prevDay, symbol) => {
                             if (prevDay.volume >= this.options.minVolume && priceChanges >= this.options.minPriceChangeNumber) {
                                 resolve(true);
                             }
@@ -133,9 +123,9 @@ module.exports = class Analyzer {
 
                 if (priceChanges >= this.options.minPriceChangeNumber) {
                     resolve(true);
+                } else {
+                    resolve(false);
                 }
-
-                resolve(false);
             } catch (err) {
                 console.error(err);
                 reject(err);

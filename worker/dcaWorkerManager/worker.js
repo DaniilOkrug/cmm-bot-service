@@ -1,12 +1,11 @@
 const { parentPort, workerData } = require("worker_threads");
 const { BroadcastChannel } = require('broadcast-channel');
 const { DcaBot } = require('../../utils/dcaBot/dcaBot');
-const Analyzer = require("./service/analyzer.service");
-const { resolve } = require("path");
 
 console.log(`New DCA Bot`);
 
 const channelOrders = new BroadcastChannel(`${workerData.api} Orders`);
+const botsChannel = new BroadcastChannel(`Bots info`);
 
 const StatusEnum = {
     preparing: "PREPARE", // Bot prepares for the cycle
@@ -26,19 +25,27 @@ const bot = new DcaBot({
 });
 
 
-parentPort.on('message', async data => {  
+parentPort.on('message', async data => {
     switch (data.type) {
         case "STOP":
             console.log(`[${workerData.pair}] Stopping bot!`);
 
             status = StatusEnum.stopping;
 
-            if (typeof bot.orders.takeProfit === 'undefined'){
+            if (typeof bot.orders.takeProfit === 'undefined') {
                 channelOrders.close();
 
                 await closeBookTickerSocket();
-                
-                await bot.cancelGrid(workerData.pair).then(() => {
+
+                await bot.cancelGrid(workerData.pair);
+
+                botsChannel.postMessage(JSON.stringify({
+                    type: "DELETE",
+                    bot: {
+                        botId: workerData.botId,
+                        deposit: workerData.deposit
+                    }
+                })).then(() => {
                     parentPort.postMessage({ type: 'TERMINATE' });
                     parentPort.close();
                 });
@@ -46,19 +53,40 @@ parentPort.on('message', async data => {
 
             break;
         case "DELETE":
-            console.log(`[${workerData.pair}] Deleting bot!`);
-            await closeBookTickerSocket();
+            const deletePromise = new Promise(async (resolve, reject) => {
+                try {
+                    console.log(`[${workerData.pair}] Deleting bot!`);
+                    await closeBookTickerSocket();
 
-            await bot.cancelGrid(workerData.pair)
+                    const takeProfit = bot.orders.takeProfit;
+                    if (typeof takeProfit != 'undefined') {
+                        await bot.cancelTakeProfit(workerData.pair);
 
-            const takeProfit = bot.orders.takeProfit;
-            if (typeof takeProfit != 'undefined') {
-                await bot.binance.marketSell(workerData.pair, takeProfit.qty);
-            }
+                        await bot.binance.marketSell(workerData.pair, takeProfit.qty);
+                    }
 
-            parentPort.postMessage({ type: 'TERMINATE' });
-            parentPort.close();
+                    await bot.cancelGrid(workerData.pair);
 
+                    await botsChannel.postMessage(JSON.stringify({
+                        type: "DELETE",
+                        bot: {
+                            botId: workerData.botId,
+                            deposit: workerData.deposit
+                        }
+                    }));
+
+                    resolve();
+                } catch (err) {
+                    reject(err);
+                }
+            });
+
+            deletePromise
+                .catch(err => console.log(err))
+                .finally(() => {
+                    parentPort.postMessage({ type: 'TERMINATE' });
+                    parentPort.close();
+                });
             break;
         default:
             break;
@@ -75,7 +103,7 @@ parentPort.on('status', () => {
 parentPort.on('stop', () => {
     console.log('Stopping bot!');
 
-    status = StatusEnum.stopping;
+    status = StatusEnum.j;
 });
 
 // debug
@@ -93,7 +121,7 @@ bot.binance.websockets.bookTickers(workerData.pair, async (data) => {
             const orders = bot.orders;
 
             if (typeof orders.takeProfit != 'undefined') {
-                
+
                 if (!isTPdefined) console.log(`[${workerData.pair}] Takeprofit exists`);
 
                 isTPdefined = true;
@@ -156,8 +184,14 @@ bot.binance.websockets.bookTickers(workerData.pair, async (data) => {
             }
         }
     } catch (err) {
-        console.error(err);
+        if (err.body) {
+            console.log(Object.keys(err));
+        } else {
+            console.error(err);
+        }
+
         channelOrders.close();
+
         throw new Error(err);
     }
 });
@@ -165,12 +199,13 @@ bot.binance.websockets.bookTickers(workerData.pair, async (data) => {
 channelOrders.onmessage = async (data) => {
     try {
         const orderTypeCondition = (data.s == workerData.pair && data.X == 'FILLED' && data.e == 'executionReport');
-        const statusCondition = (status == StatusEnum.active || status == StatusEnum.stopping);
-        if (orderTypeCondition && statusCondition) {
+        if (orderTypeCondition) {
             const orderType = await bot.determineOrder(data);
             switch (orderType) {
                 case 'GRID':
-                    status = StatusEnum.grid;
+                    if (status != StatusEnum.stopping) {
+                        status = StatusEnum.grid;
+                    }
 
                     // Reset timer if exists
                     const cycleUpTimerId = bot.timers.cycleUpTimer.id;
@@ -184,7 +219,7 @@ channelOrders.onmessage = async (data) => {
                     for (let i = 0; i < bot.orders.grid.length; i++) {
                         const order = bot.orders.grid[i];
 
-                        if (order.orderId == data.i) {
+                        if (order.orderId == data.i) { 
                             bot.orders.grid[i].status = data.X;
                             break;
                         }
@@ -196,79 +231,64 @@ channelOrders.onmessage = async (data) => {
                     status = StatusEnum.active;
                     break;
                 case 'TAKEPROFIT':
-                    status = StatusEnum.takeprofit;
+                    if (status != StatusEnum.stopping) {
+                        status = StatusEnum.takeprofit;
+                    }
 
                     delete bot.orders.takeProfit;
 
-                    await bot.cancelGrid(data.s).then(() => {
-                        if (status = StatusEnum.stopping) {
-                            parentPort.postMessage({ type: 'TERMINATE' });
-                            parentPort.close();
-                            return;
+                    await bot.cancelGrid(data.s);
+
+                    await botsChannel.postMessage(JSON.stringify({
+                        type: "READY",
+                        bot: {
+                            botId: workerData.botId,
+                            deposit: workerData.deposit
                         }
+                    })).then(() => {
+                        parentPort.postMessage({ type: 'TERMINATE' });
+                        parentPort.close();
                     });
-
-                    if (bot.options.grid.endCycleDelay != 0) {
-                        bot.timers.endCycleTimer.isExecutes = true;
-                        status = StatusEnum.endCycleDelay;
-
-                        console.log(`[${workerData.pair}] Start timer for end cycle!`)
-
-                        bot.timers.endCycleTimer.id = createEndCycleTimer(bot);
-                    } else {
-                        const grid = await bot.calculateGrid();
-                        console.log(grid);
-                        await bot.startCycle(grid);
-                        showBeginPrice = true;
-
-                        status = StatusEnum.active;
-                    }
                     break;
                 default:
+                    console.log(`[${workerData.pair}] Other orderType`);
                     break;
             }
         }
     } catch (err) {
         console.error(err);
         channelOrders.close();
+        console.log(Object.keys(err));
         throw new Error(err);
     }
 }
 
 (async () => {
     try {
-        if (workerData.analyzer.enabled) {
-            const analyzer = new Analyzer({
-                ...workerData.analyzer,
-                pair: workerData.pair,
-                algorithm: workerData.algorithm
-            });
-            
-            await analyzer.getSignal().then(async () => {
-                console.log('Signal from analyzer');
-                bot.pairsInfo = await bot.getPairsData();
+        status = StatusEnum.preparing;
 
-                const grid = await bot.calculateGrid();
+        bot.pairsInfo = await bot.getPairsData();
 
-                await bot.startCycle(grid);
+        const grid = await bot.calculateGrid();
 
-                console.log(grid);
-            });
-        } else {
-            bot.pairsInfo = await bot.getPairsData();
+        await bot.startCycle(grid);
 
-            const grid = await bot.calculateGrid();
+        console.log(grid);
 
-            await bot.startCycle(grid);
-
-            console.log(grid);
-        }
+        status = StatusEnum.active;
 
         setInterval(() => {
-            console.log(bot.getUsedWeight());
+            const weigth = bot.getUsedWeight(); 
+            if (weigth > 900) {
+                console.log("Used API Weight: " + weigth);
+            }
         }, 60000);
     } catch (err) {
-        console.error(err);
+        if (err.body) {
+            console.log(Object.keys(err));
+        } else {
+            console.error(err);
+        }
     }
 })();
 
@@ -281,7 +301,7 @@ function createCycleUpTimer(bot) {
 
         if (bot.options.grid.newGridDelay != 0) {
             status = StatusEnum.newGridDelay;
-            
+
             console.log(`[${workerData.pair}] Start timer for new grid placing!`)
 
             bot.timers.newGridTimer.id = createNewGridTimer(bot);
@@ -301,12 +321,14 @@ function createCycleUpTimer(bot) {
 
 function createNewGridTimer(bot) {
     return setTimeout(async () => {
-        bot.timers.newGridTimer.isExecutes = true;
+        try {
+            bot.timers.newGridTimer.isExecutes = true;
 
-        const grid = await bot.calculateGrid();
-        console.log(grid);
+            const grid = await bot.calculateGrid();
+            console.log(grid);
 
-        bot.startCycle(grid).then(() => {
+            await bot.startCycle(grid);
+
             bot.timers.cycleUpTimer.isExecutes = false;
             delete bot.timers.cycleUpTimer.id;
 
@@ -316,37 +338,40 @@ function createNewGridTimer(bot) {
             showBeginPrice = true;
 
             status = StatusEnum.active;
-        });
+        } catch (err) {
+            console.error(err);
+        }
     }, bot.options.grid.newGridDelay * 60000);
 }
 
 function createEndCycleTimer(bot) {
     return setTimeout(async () => {
-        const grid = await bot.calculateGrid();
-        console.log(grid);
+        try {
+            bot.timers.endCycleTimer.isExecutes = true;
 
-        bot.startCycle(grid).then(() => {
-            bot.timers.endCycleTimer.isExecutes = false;
-            delete bot.timers.endCycleTimer.id;
-
-            showBeginPrice = true;
-
-            status = StatusEnum.active;
-        });
+            parentPort.postMessage({ type: 'TERMINATE' });
+            parentPort.close();
+        } catch (err) {
+            console.error(err);
+        }
     }, bot.options.grid.endCycleDelay * 60000);
 }
 
 function closeBookTickerSocket() {
     return new Promise(async (resolve, reject) => {
-        let endpoints = Object.keys(await bot.binance.websockets.subscriptions());
+        try {
+            let endpoints = Object.keys(await bot.binance.websockets.subscriptions());
 
-        for (let endpoint in endpoints) {
-            if (endpoint == `${workerData.pair.toLowerCase()}@bookTicker`) {
-                await bot.binance.websockets.terminate(endpoint);
-                break;
+            for (let endpoint in endpoints) {
+                if (endpoint == `${workerData.pair.toLowerCase()}@bookTicker`) {
+                    await bot.binance.websockets.terminate(endpoint);
+                    break;
+                }
             }
-        }
 
-        resolve();
+            resolve();
+        } catch (err) {
+            reject(err);
+        }
     });
 }

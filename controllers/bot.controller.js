@@ -1,3 +1,4 @@
+const apiService = require('../services/api.service');
 const botService = require('../services/bot.service');
 
 class BotController {
@@ -7,7 +8,7 @@ class BotController {
 
             const response = await botService.start(botId);
 
-            res.json({});
+            res.json(response);
         } catch (err) {
             console.log(err);
             next();
@@ -23,7 +24,7 @@ class BotController {
             res.json(response);
         } catch (err) {
             console.log(err);
-            next();
+            next(err);
         }
     }
 
@@ -36,7 +37,40 @@ class BotController {
             res.json(response);
         } catch (err) {
             console.log(err);
-            next();
+            next(err);
+        }
+    }
+
+    async check(req, res, next) {
+        try {
+            const { key, secret, exchange } = req.body;
+            
+            const response = await apiService.checkApi(key, secret, exchange);
+
+            res.json(response);
+        } catch (err) {
+            next(err);
+        }
+    }
+
+    async updateSettings(req, res, next) {
+        try {
+            const response = await botService.updateSettings();
+
+            res.json(response);
+        } catch (err) {
+            next(err);
+        }
+    }
+
+    async getPairs(req, res, next) {
+        try {
+
+            const response = await apiService.getPairs();
+
+            res.json(response);
+        } catch (err) {
+            next(err);
         }
     }
 }

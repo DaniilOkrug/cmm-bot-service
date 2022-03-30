@@ -1,53 +1,55 @@
-const apiWorkerManager = (require('../worker/apiWorkerManager/index')).getInstance();
-const dcaWorkerManager = (require('../worker/dcaWorkerManager/index')).getInstance();
-
+const apiWorkerManager = require('../worker/apiWorkerManager/index');
 const userBotModel = require('../models/General/userBot.model');
 const botModel = require('../models/General/bot.model');
 const apiModel = require('../models/General/api.model');
+const botManager = require('../worker/botManager');
 
 class BotService {
     async start(botId) {
+        const botData = (await botModel.find())[0];
         const userBotData = await userBotModel.findById(botId);
         const apiData = await apiModel.findById(userBotData.api);
-        const botData = await botModel.findById(userBotData.bot);
 
-        const apiStatus = await apiWorkerManager.checkAPI(apiData.key, apiData.secret);
+        const isApiExists = apiWorkerManager.checkAPI(apiData.key, apiData.secret);
+        const isBotManagerExists = botManager.isActive(apiData.key, apiData.secret);
 
-        const botSettings = {
-            ...botData.settings,
-            pair: userBotData.pair,
-            deposit: userBotData.deposit
-        }
-        if (apiStatus) {
-            console.log('API existed');
-            const apiChannel = apiWorkerManager.getChannel(apiData.key, apiData.secret);
-            dcaWorkerManager.createWorker(botId, apiData.key, apiData.secret, botSettings);
-        } else {
-            const apiChannel = await apiWorkerManager.createWorker(apiData.key, apiData.secret);
-            await dcaWorkerManager.createWorker(botId, apiData.key, apiData.secret, botSettings);;
+        if (!isApiExists) {
+            await apiWorkerManager.createWorker(apiData.key, apiData.secret);
         }
 
-        return {}
+        if (!isBotManagerExists) {
+            await botManager.createWorker(apiData.key, apiData.secret, botData.settings);
+        }
+
+        await botManager.addBot(apiData.key, apiData.secret, botId, userBotData.deposit);
+
+        return {
+            status: 'Wait'
+        }
     }
 
     async stop(botId) {
-        await dcaWorkerManager.stopWorker(botId);
+        const userBotData = await userBotModel.findById(botId);
+        const apiData = await apiModel.findById(userBotData.api);
 
-        return { message: "Stopping" }
+        botManager.stopBot(apiData.key, apiData.secret, botId);
+
+        return { status: "Stopping" }
     }
 
     async delete(botId) {
         const userBotData = await userBotModel.findById(botId);
         const apiData = await apiModel.findById(userBotData.api);
 
-        await dcaWorkerManager.deleteWorker(botId);
-        const apiBots = dcaWorkerManager.getWorkers(apiData.key, apiData.secret);
+        await botManager.deleteBot(apiData.key, apiData.secret, botId);
 
-        if (apiBots.length == 0) {
-            apiWorkerManager.deleteWorker(apiData.key, apiData.secret);
-        }
+        return { status: "Disabled" }
+    }
 
-        return { message: "Deleted" };
+    async updateSettings() {
+        const botData = (await botModel.find())[0];
+
+        botManager.updateBotSettings(botData.settings);
     }
 }
 

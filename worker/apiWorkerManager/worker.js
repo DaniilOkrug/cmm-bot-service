@@ -2,34 +2,40 @@ const { parentPort, workerData } = require("worker_threads");
 const Binance = require('node-binance-api');
 const { BroadcastChannel } = require('broadcast-channel');
 
+console.log(`New API Listener`);
+
 const binance = new Binance().options({
     APIKEY: workerData.key,
     APISECRET: workerData.secret,
     reconnect: true,
     keepAlive: true,
     useServerTime: true,
-    recvWindow: 5000
+    recvWindow: 60000
 });
 
-console.log(`New API Listener`);
-
+//Broadcast Channels
 const channelOrders = new BroadcastChannel(`${workerData.key} Orders`);
 
+//Get message from Main thread
 parentPort.on("message", async data => {
-    if (data.close) {
-        channelOrders.close();
+    switch (data.type) {
+        case "CLOSE":
+            channelOrders.close();
 
-        let endpoints = await binance.websockets.subscriptions();
-        for (let endpoint in endpoints) {
-            await binance.websockets.terminate(endpoint);
-        }
-
-        setInterval(async () => {
-            if (Object.keys(await binance.websockets.subscriptions()).length == 0) {
-                parentPort.postMessage({ type: 'TERMINATE' });
-                parentPort.close();
+            let endpoints = await binance.websockets.subscriptions();
+            for (let endpoint in endpoints) {
+                await binance.websockets.terminate(endpoint);
             }
-        }, 200);
+
+            setInterval(async () => {
+                if (Object.keys(await binance.websockets.subscriptions()).length == 0) {
+                    parentPort.postMessage({ type: 'TERMINATE' });
+                    parentPort.close();
+                }
+            }, 200);
+            break;
+        default:
+            throw new Error('Wrong API data!');
     }
 });
 
