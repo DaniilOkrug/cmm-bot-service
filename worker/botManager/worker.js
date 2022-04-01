@@ -132,10 +132,13 @@ botsChannel.onmessage = async (data) => {
         console.log(closeInfo);
         logger.info("Bot finished work " + JSON.stringify(data));
 
+        //Delete from active bots
+        const bot = activeBots.find(info => info.botId === closeInfo.bot.botId);
+        const index = activeBots.indexOf(bot);
+        if (index > -1) activeBots.splice(index, 1);
+
         //Check for disabling bot
         if (closeInfo.type === "DELETE") {
-            const bot = activeBots.find(info => info.botId === closeInfo.bot.botId);
-
             parentPort.postMessage({
                 type: "BOT_STATUS_UPDATE",
                 data: {
@@ -143,10 +146,6 @@ botsChannel.onmessage = async (data) => {
                     status: "Disabled"
                 }
             });
-
-            //Delete from active bots
-            const index = activeBots.indexOf(bot);
-            if (index > -1) activeBots.splice(index, 1);
 
             //If no active and available bots then terminate Bot manager worker 
             if (activeBots.length === 0 && availableBots.length === 0) {
