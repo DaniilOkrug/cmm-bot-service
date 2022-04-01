@@ -83,16 +83,15 @@ parentPort.on("message", async botTask => {
 //Get signal from analyzer and deliver finding free bot
 channelSignal.onmessage = async (pair) => {
     try {
-        const freeBot = availableBots.shift();
-
-        //No available bots
-        if (typeof freeBot === 'undefined') return;
-
         //Find bot with same pair
         const botWithPair = activeBots.find(bot => bot.pair == pair)
 
         //If pair exists then skip signal
         if (typeof botWithPair !== 'undefined') return
+
+        //No available bots
+        const freeBot = availableBots.shift();
+        if (typeof freeBot === 'undefined') return;
         
         logger.info("Start bot with pair: " + pair + ' ' + freeBot.botId);
 
