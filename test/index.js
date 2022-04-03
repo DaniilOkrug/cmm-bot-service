@@ -2,9 +2,13 @@ require('dotenv').config();
 const expect = require('chai').expect;
 const assert = require('chai').assert;
 
+const Binance = require('node-binance-api');
 const { connectDB } = require('../loaders/connectionDB.loader');
 const apiModel = require('../models/General/api.model');
 const userBotModel = require('../models/General/userBot.model');
+const Analyzer = require('../worker/analyzerWorker/analyzer');
+const rma = require('../worker/analyzerWorker/indecators/rma');
+const rsi = require('../worker/analyzerWorker/indecators/rsi');
 const botManager = require('../worker/botManager');
 const dcaBotManager = require("../worker/dcaWorkerManager/index");
 
@@ -127,5 +131,52 @@ describe("Bot Manager tests", function () {
                 setTimeout(() => reslove(), 3000)
             },3000);
         });
+    });
+});
+
+describe("Inidcators test", function() {
+    it("RSI", async () => {
+        let binance = new Binance().options({
+            useServerTime: true,
+            recvWindow: 60000,
+        });
+
+        const ticks = await binance.candlesticks("COMPUSDT", '1m', false, { limit: 15 });
+
+        const closePrices = [];
+        ticks.forEach((tick, index, array) => {
+            let [time, open, high, low, close, volume, closeTime, assetVolume, trades, buyBaseVolume, buyAssetVolume, ignored] = tick;
+
+            closePrices.push(close);
+        });
+
+        const rsiValue = rsi.calculate(closePrices.reverse(), 14, 'COMPUSDT');
+
+        console.log(rsiValue);
+    });
+});
+
+describe("Analyzer test", function () {
+    this.timeout(10000);
+    it("getSignal", async () => {
+        const analyzer = new Analyzer({
+            enabled: true,
+            period: '1h',
+            interval: '1m',
+            priceChange: 0.01,
+            minPriceChangeNumber: 1,
+            minVolume: 1000,
+            algorithm: 'long',
+            rsi: {
+                enabled: true,
+                length: 14,
+                timeframes: ['1m', '5m', '15m', '1d'],
+                value: 70
+            }
+        });
+
+        const signal = await analyzer.getSignal('XRPUSDT');
+
+        console.log(signal);
     });
 });
