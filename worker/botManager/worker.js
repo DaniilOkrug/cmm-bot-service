@@ -29,8 +29,6 @@ parentPort.on("message", async botTask => {
             break;
         case "DELETE":
             console.log("Delete dca bot by manager");
-            console.log('Available Bots: ', availableBots);
-            console.log('Active bots: ', activeBots);
 
             //Bot is availbale and waits signals
             const availableBotData = availableBots.find(botInfo => botInfo.botId === botTask.botId);
@@ -45,6 +43,9 @@ parentPort.on("message", async botTask => {
             if (typeof activeBotData !== 'undefined') {
                 await dcaWorkerManager.deleteWorker(botTask.botId);
             }
+
+            console.log('Available Bots: ', availableBots);
+            console.log('Active bots: ', activeBots);
 
             //Bot manager doen't has bots
             if (activeBots.length === 0 && availableBots.length === 0) {

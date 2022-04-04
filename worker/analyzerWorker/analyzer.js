@@ -6,6 +6,7 @@ module.exports = class Analyzer {
 
     constructor(options) {
         this.options = options;
+        console.log(this.options);
     }
 
     getSignal(pair) {

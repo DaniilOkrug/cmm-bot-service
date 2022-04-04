@@ -2,12 +2,13 @@ const { parentPort, workerData } = require("worker_threads");
 const { BroadcastChannel } = require('broadcast-channel');
 const Analyzer = require('./analyzer');
 
-const analyzer = new Analyzer(workerData);
+const settings = JSON.parse(workerData);
+const analyzer = new Analyzer(settings);
 const channelSignal = new BroadcastChannel(`Signal`);
 
 const intervals = {}; // pair: intervalID
 
-let intervalTime = calculateIntervalTime(workerData.interval)
+let intervalTime = calculateIntervalTime(settings.interval)
 
 parentPort.on('message', async (pair) => {
     // console.log('[Analyzer] getting signal');

@@ -7,10 +7,10 @@ class AnalyzerService {
             const botSettings = (await botModel.find())[0];
 
             const worker = new Worker("./worker/analyzerWorker/worker.js", {
-                workerData: {
+                workerData: JSON.stringify({
                     ...botSettings.settings.analyzer,
                     algorithm: botSettings.settings.algorithm
-                }
+                })
             });
 
             worker.on("message", async (data) => {

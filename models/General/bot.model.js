@@ -12,6 +12,12 @@ const BotShema = new Schema({
             priceChange: { type: Number },
             minPriceChangeNumber: { type: Number },
             minVolume: { type: Number },
+            rsi: {
+                enabled: { type: Boolean, default: false },
+                length: { type: Number, default: 14 },
+                value: { type: Number, default: 70 },
+                timeframes: { type: Array, default: ['1m'] }
+            }
         },
         grid: {
             size: { type: Number, required: true },
