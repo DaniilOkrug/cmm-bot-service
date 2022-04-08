@@ -27,6 +27,7 @@ class BotManager {
                             worker.terminate();
                             break;
                         case "BOT_STATUS_UPDATE":
+                            console.log("BOT_STATUS_UPDATE", task.data);
                             socketService.sendBotUpdate(task.data);
                             break;
                         default:

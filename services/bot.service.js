@@ -43,6 +43,7 @@ class BotService {
 
         botManager.deleteBot(apiData.key, apiData.secret, botId)
             .finally(() => {
+                console.error('Promise -> Deleting bot error');
                 return { status: "Disabled" };
             });
     }
