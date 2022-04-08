@@ -35,8 +35,7 @@ parentPort.on("message", async botTask => {
             //Bot is availbale and waits signals
             const availableBotData = availableBots.find(botInfo => botInfo.botId === botTask.botId);
             if (typeof availableBotData !== 'undefined') {
-                const bot = availableBotData.find(info => info.botId === botTask.botId);
-                const index = availableBotData.indexOf(bot);
+                const index = availableBotData.indexOf(availableBotData);
                 if (index > -1) availableBotData.splice(index, 1);
             }
 
