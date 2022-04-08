@@ -41,13 +41,14 @@ class BotService {
         const userBotData = await userBotModel.findById(botId);
         const apiData = await apiModel.findById(userBotData.api);
 
-        botManager.deleteBot(apiData.key, apiData.secret, botId)
-            .catch(() => {
-                console.error('Promise -> Deleting bot error');
-            })
-            .finally(() => {
-                return { status: "Disabled" };
-            });
+        try {
+            await botManager.deleteBot(apiData.key, apiData.secret, botId)
+        } catch (error) {
+            console.error('Promise -> Deleting bot error');
+            console.log(error);
+        }
+        
+        return { status: "Disabled" };
     }
 
     async updateSettings() {
