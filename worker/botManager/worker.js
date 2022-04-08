@@ -37,6 +37,14 @@ parentPort.on("message", async botTask => {
             if (typeof availableBotData !== 'undefined') {
                 const index = availableBotData.indexOf(availableBotData);
                 if (index > -1) availableBotData.splice(index, 1);
+
+                parentPort.postMessage({
+                    type: "BOT_STATUS_UPDATE",
+                    data: {
+                        botId: availableBotData.botId,
+                        status: "Disabled"
+                    }
+                });
             }
 
             //Bot is active
@@ -64,7 +72,15 @@ parentPort.on("message", async botTask => {
                 const index = availableBots.indexOf(bot);
                 if (index > -1) availableBots.splice(index, 1);
 
-                if (activeBots.length === 0 && availableBots.length === 0) {
+                parentPort.postMessage({
+                    type: "BOT_STATUS_UPDATE",
+                    data: {
+                        botId: bot.botId,
+                        status: "Disabled"
+                    }   
+                });
+
+                if (activeBots.length === 0 && availableBots.length === 0) {                    
                     parentPort.postMessage({ type: "TERMINATE" });
                     parentPort.close();
                 }
