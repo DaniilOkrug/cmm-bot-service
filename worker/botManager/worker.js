@@ -5,11 +5,13 @@ const { logger } = require('../../utils/logger/logger');
 
 console.log("New Bot Manager");
 
+const dataWorker = JSON.parse(workerData);
+
 const channelSignal = new BroadcastChannel(`Signal`);               //Signal for opening Bots
 const botsChannel = new BroadcastChannel(`Bots info`);       //Bots send own id when terminates
 const settingsChannel = new BroadcastChannel(`Settings`);           //Channel for updating bot settings
 
-let botSettings = workerData.botSettings; //Settings for DCA bots
+let botSettings = dataWorker.botSettings; //Settings for DCA bots
 let availableBots = []; //Contain information about free user bots
 let activeBots = []; //Contain information about free user bots
 
@@ -106,7 +108,7 @@ channelSignal.onmessage = async (pair) => {
             deposit: freeBot.deposit,
             ...botSettings
         }
-        await dcaWorkerManager.createWorker(freeBot.botId, workerData.key, workerData.secret, settings);
+        await dcaWorkerManager.createWorker(freeBot.botId, dataWorker.key, dataWorker.secret, settings);
 
         //Send update bot status to the main server
         parentPort.postMessage({
