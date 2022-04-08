@@ -42,8 +42,10 @@ class BotService {
         const apiData = await apiModel.findById(userBotData.api);
 
         botManager.deleteBot(apiData.key, apiData.secret, botId)
-            .finally(() => {
+            .catch(() => {
                 console.error('Promise -> Deleting bot error');
+            })
+            .finally(() => {
                 return { status: "Disabled" };
             });
     }
