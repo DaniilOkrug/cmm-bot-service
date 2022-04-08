@@ -13,13 +13,13 @@ class BotManager {
                 if (typeof this.#settingsChannel === 'undefined')
                     this.#settingsChannel = new BroadcastChannel(`Settings`);
 
-                const worker = new Worker("./worker/botManager/worker.js", JSON.stringify({
-                    workerData: {
+                const worker = new Worker("./worker/botManager/worker.js", {
+                    workerData: JSON.stringify({
                         key,
                         secret,
                         botSettings,
-                    }
-                }));
+                    })
+                });
 
                 worker.on("message", async (task) => {
                     switch (task.type) {
