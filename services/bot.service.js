@@ -1,8 +1,10 @@
 const apiWorkerManager = require('../worker/apiWorkerManager/index');
+const analyzerService = (require('./analyzer.service')).getInstance();
 const userBotModel = require('../models/General/userBot.model');
 const botModel = require('../models/General/bot.model');
 const apiModel = require('../models/General/api.model');
 const botManager = require('../worker/botManager');
+const { logger } = require('../utils/logger/logger');
 
 class BotService {
     async start(botId) {
@@ -46,15 +48,35 @@ class BotService {
         } catch (error) {
             console.error('Promise -> Deleting bot error');
             console.log(error);
+            logger.error(err);
         }
-        
+
         return { status: "Disabled" };
     }
 
     async updateSettings() {
         const botData = (await botModel.find())[0];
 
-        botManager.updateBotSettings(botData.settings);
+        try {
+            await botManager.updateBotSettings(botData.settings);
+
+            const settings = JSON.parse(JSON.stringify(botData.settings.analyzer));
+            settings.algorithm = botData.settings.algorithm;
+            analyzerService.updateSettings(botData.pairs, settings);
+        } catch (err) {
+            logger.error(err);
+            return { status: "Error", message: err }
+        }
+
+        return { status: "Updated" };
+    }
+
+    async updateBlacklist() {
+        const botData = (await botModel.find())[0];
+        
+        analyzerService.updateBlacklist(botData._doc.blacklist);
+
+        return { status: "Updated" };
     }
 }
 

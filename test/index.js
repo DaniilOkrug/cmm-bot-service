@@ -172,11 +172,28 @@ describe("Analyzer test", function () {
                 length: 14,
                 timeframes: ['1m', '5m', '15m', '1d'],
                 value: 70
+            },
+            pampAndDump: {
+                enabled: true,
+                filters: [
+                    {
+                        period: 60,          // in minutes
+                        priceChange: 10     // price change percent
+                    },
+                    {
+                        period: 120,
+                        priceChange: 20
+                    },
+                ]
             }
         });
 
-        const signal = await analyzer.getSignal('XRPUSDT');
-
-        console.log(signal);
+        console.log('Signal', await analyzer.getSignal('XRPUSDT'));
+        console.log('Signal', await analyzer.getSignal('XRPUSDT'));
+        console.log('Signal', await analyzer.getSignal('XRPUSDT'));
+        console.log('Signal', await analyzer.getSignal('XRPUSDT'));
+        // console.log(await analyzer.getSignal('ADAUSDT'));
+        // console.log(await analyzer.getSignal('BTCUSDT'));
+        // console.log(await analyzer.getSignal('ETHUSDT'));
     });
 });

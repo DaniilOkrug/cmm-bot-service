@@ -1,54 +1,63 @@
 const { parentPort, workerData } = require("worker_threads");
 const { BroadcastChannel } = require('broadcast-channel');
 const Analyzer = require('./analyzer');
+const { logger } = require("../../utils/logger/logger");
 
 const settings = JSON.parse(workerData);
+console.log(settings);
 const analyzer = new Analyzer(settings);
 const channelSignal = new BroadcastChannel(`Signal`);
 
-const intervals = {}; // pair: intervalID
-
+let intervalId;
 let intervalTime = calculateIntervalTime(settings.interval)
+let pairs = [...settings.pairs];
+let blacklist = [...settings.blacklist];
 
-parentPort.on('message', async (pair) => {
-    // console.log('[Analyzer] getting signal');
-    const signal = await analyzer.getSignal(pair);
+parentPort.on('message', async (jobString) => {
+    try {
+        const job = JSON.parse(jobString);
 
-    if (signal) {
-        channelSignal.postMessage(pair);
+        switch (job.task) {
+            case 'UPDATE_SETTINGS':
+                pairs = job.pairs;
+                analyzer.options = job.settings;
+                console.log('[Analyzer] Settings updated!');
+                break;
+
+            case 'UPDATE_BLACKLIST':
+                blacklist = job.blacklist;
+                console.log('[Analyzer] Blacklist updated!');
+                break;
+
+            default:
+                break;
+        }
+    } catch (err) {
+        console.log(err);
+        logger.error(err);
     }
+});
 
-    const intervalId = setInterval(async () => {
-        // console.log('[Analyzer] getting signal');
+(async () => {
+    for (const pair of pairs.filter(pair => !blacklist.includes(pair))) {
         const signal = await analyzer.getSignal(pair);
 
         if (signal) {
             channelSignal.postMessage(pair);
         }
-    }, intervalTime);
+    }
 
-    intervals[pair] = intervalId;
-});
+    intervalId = setInterval(async () => {
+        const availablePairs = pairs.filter(pair => !blacklist.includes(pair));
+        for (const pair of availablePairs) {
+            const signal = await analyzer.getSignal(pair);
 
-parentPort.on('clearPairs', () => {
-    clearActivePairs();
-});
-
-function clearActivePairs() {
-    return new Promise((resolve, reject) => {
-        const activePairs = Object.keys(intervals);
-
-        if (activePairs.length === 0) return
-
-        for (pair in activePairs) {
-            const intevalID = activePairs.pair;
-            clearInterval(intevalID);
-            delete activePairs.pair;
+            if (signal) {
+                channelSignal.postMessage(pair);
+            }
         }
-
-        resolve();
-    });
-}
+    }, intervalTime);
+})();
 
 function calculateIntervalTime(interval) {
     const intervalToken = (interval.match(/(\d+)/))[0];

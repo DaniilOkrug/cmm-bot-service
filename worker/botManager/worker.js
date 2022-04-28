@@ -9,7 +9,6 @@ const dataWorker = JSON.parse(workerData);
 
 const channelSignal = new BroadcastChannel(`Signal`);               //Signal for opening Bots
 const botsChannel = new BroadcastChannel(`Bots info`);       //Bots send own id when terminates
-const settingsChannel = new BroadcastChannel(`Settings`);           //Channel for updating bot settings
 
 let botSettings = dataWorker.botSettings; //Settings for DCA bots
 let availableBots = []; //Contain information about free user bots
@@ -29,6 +28,7 @@ parentPort.on("message", async botTask => {
             console.log(activeBots);
 
             break;
+
         case "DELETE":
             console.log("Delete dca bot by manager");
 
@@ -63,6 +63,7 @@ parentPort.on("message", async botTask => {
             }
 
             break;
+
         case "STOP":
             const botData = dcaWorkerManager.getWorker(botTask.botId);
 
@@ -89,9 +90,16 @@ parentPort.on("message", async botTask => {
             }
 
             break;
+
         case "RESUME":
 
             break;
+        
+        case "UPDATE_SETTINGS":
+            botSettings = JSON.parse(botTask.settings);
+            console.log('[Worker] Bot settings updated!');
+            break;
+
         default:
             console.log("Unknown command");
             break;
@@ -193,8 +201,3 @@ botsChannel.onmessage = async (data) => {
         console.log(err);
     }
 }
-
-//Updates settings
-settingsChannel.onmessage = (settings) => {
-    botSettings = settings;
-};

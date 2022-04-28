@@ -28,17 +28,19 @@ class RMA {
 
             let sum = 0.0;
             if (type === 'GAIN') {
-                if (!this.#previousGain[symbol][timeframe]) {
-                    sum = sma.calculate(source, length);
-                } else {
-                    sum = (source[0] + (length - 1) * this.#previousGain[symbol]) / length;
-                }
+                sum = sma.calculate(source, length);
+                // if (!this.#previousGain[symbol][timeframe]) {
+                //     sum = sma.calculate(source, length);
+                // } else {
+                //     sum = (source[0] + (length - 1) * this.#previousGain[symbol][timeframe]) / length;
+                // }
             } else if (type === 'LOSS') {
-                if (!this.#previousLoss[symbol][timeframe]) {
-                    sum = sma.calculate(source, length);
-                } else {
-                    sum = (source[0] + (length - 1) * this.#previousLoss[symbol]) / length;
-                }
+                sum = sma.calculate(source, length);
+                // if (!this.#previousLoss[symbol][timeframe]) {
+                //     sum = sma.calculate(source, length);
+                // } else {
+                //     sum = (source[0] + (length - 1) * this.#previousLoss[symbol][timeframe]) / length;
+                // }
             } else {
                 throw new Error('Wrong calucate type in RMA');
             }

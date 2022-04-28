@@ -44,7 +44,7 @@ class BotController {
     async check(req, res, next) {
         try {
             const { key, secret, exchange } = req.body;
-            
+
             const response = await apiService.checkApi(key, secret, exchange);
 
             res.json(response);
@@ -56,7 +56,15 @@ class BotController {
     async updateSettings(req, res, next) {
         try {
             const response = await botService.updateSettings();
+            res.json(response);
+        } catch (err) {
+            next(err);
+        }
+    }
 
+    async updateBlacklist(req, res, next) {
+        try {
+            const response = await botService.updateBlacklist();
             res.json(response);
         } catch (err) {
             next(err);

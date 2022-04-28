@@ -1,6 +1,7 @@
 const { Worker } = require("worker_threads");
 const { BroadcastChannel } = require('broadcast-channel');
 const socketService = require("../../services/socket.service");
+const { logger } = require("winston");
 
 class BotManager {
     #workers = [];
@@ -10,8 +11,6 @@ class BotManager {
         return new Promise((resolve, reject) => {
             try {
                 console.log("Create new bot manager");
-                if (typeof this.#settingsChannel === 'undefined')
-                    this.#settingsChannel = new BroadcastChannel(`Settings`);
 
                 const worker = new Worker("./worker/botManager/worker.js", {
                     workerData: JSON.stringify({
@@ -117,8 +116,21 @@ class BotManager {
     }
 
     updateBotSettings(botSettings) {
-        console.log("Update settings");
-        this.#settingsChannel.postMessage(botSettings);
+        return new Promise((resolve, reject) => {
+            try {
+                console.log("Update settings");
+                this.#workers.forEach((data) => {
+                    data.worker.postMessage({
+                        type: 'UPDATE_SETTINGS',
+                        settings: JSON.stringify(botSettings)
+                    });
+                });
+                resolve();
+            } catch (err) {
+                console.log(err);
+                reject(err);
+            }
+        });
     }
 
     isActive(key, secret) {

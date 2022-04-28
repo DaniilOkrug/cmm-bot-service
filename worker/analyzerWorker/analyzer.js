@@ -1,12 +1,12 @@
 const Binance = require('node-binance-api');
 const rsi = require('./indecators/rsi');
+const { logger } = require('../../utils/logger/logger');
 
 module.exports = class Analyzer {
     options = {};
 
     constructor(options) {
         this.options = options;
-        console.log(this.options);
     }
 
     getSignal(pair) {
@@ -19,35 +19,56 @@ module.exports = class Analyzer {
 
                 //Analyze intervals for price changes
                 if (this.options.minPriceChangeNumber > 0) {
-                    console.log('[Analyzer] check price changes');
                     const limit = this.getLimit();
+                    console.log(limit);
                     const priceChangeSignal = await this.checkPriceChanges(limit, pair);
                     if (!priceChangeSignal) {
-                        resolve(false)
+                        console.log(`[Analyzer] ${pair} price changes is bad!`);
+                        return resolve(false);
                     }
+
+                    console.log(`[Analyzer] ${pair} price changes is good!`);
                 }
                 
                 //Analyze volumes
                 if (this.options.minVolume > 0) {
-                    console.log('[Analyzer] check volume');
                     const volumeSignal = await this.checkVolume(pair);
                     if (!volumeSignal) {
-                        resolve(false)
+                        console.log(`[Analyzer] ${pair} volume is bad!`);
+                        return resolve(false);
                     }
+
+                    console.log(`[Analyzer] ${pair} volume is good!`);
                 }
 
                 //Ananlyze RSI
-                if(this.options.rsi.enabled) {
-                    console.log('[Analyzer] check rsi');
+                if (this.options.rsi.enabled) {
                     const rsiSignal = await this.checkRSI(pair);
                     if (!rsiSignal) {
-                        resolve(false)
+                        console.log(`[Analyzer] ${pair} RSI is bad!`);
+                        return resolve(false);
                     }
+
+                    console.log(`[Analyzer] ${pair} RSI is good!`);
+                }
+
+                //Analyze pump and dump
+                if (this.options.pampAndDump.enabled) {
+                    const pumpAndDumpSignal = await this.checkPriceChangeRate(pair);
+
+                    if (!pumpAndDumpSignal) {
+                        console.log(`[Analyzer] ${pair} Pump and Dump is bad!`);
+                        return resolve(false);
+                    }
+
+                    console.log(`[Analyzer] ${pair} Pump and Dump is good!`);
                 }
 
                 resolve(true);
             } catch (err) {
                 console.error(err);
+                logger.error(err);
+                resolve(err);
             }
         });
     }
@@ -64,7 +85,7 @@ module.exports = class Analyzer {
                     }
                 }
 
-                if (index === array.length - 1) resolve(priceChanges);
+                if (index === array.length - 1) return resolve(priceChanges);
             });
         })
     }
@@ -86,7 +107,8 @@ module.exports = class Analyzer {
                 }
             } catch (err) {
                 console.error(err);
-                reject(err);
+                logger.error(err);
+                resolve(err);
             }
         })
     }
@@ -94,6 +116,12 @@ module.exports = class Analyzer {
     checkVolume(pair) {
         return new Promise((resolve, reject) => {
             this.binance.prevDay(pair, (error, prevDay, symbol) => {
+                if (error) {
+                    console.log(error);
+                    logger.error(error);
+                    return resolve(false);
+                }
+                
                 if (prevDay.volume >= this.options.minVolume) {
                     resolve(true);
                 } else {
@@ -101,6 +129,86 @@ module.exports = class Analyzer {
                 }
             });
         })
+    }
+
+    checkPriceChangeRate(pair) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                if (!this.options.pampAndDump.enabled) return resolve(true);
+                if (this.options.pampAndDump.filters.length == 0) return resolve(true);
+
+                const maxMinutes = Math.max.apply(Math, this.options.pampAndDump.filters.map(function (filter) { return filter.period }));
+
+                const ticks = await this.binance.candlesticks(pair, '1m', false, { limit: maxMinutes });
+
+                //Check if ticks is valid array
+                if (typeof ticks === 'undefined') {
+                    console.log(`[Analyzer] ${pair} Ticks are undefined!`);
+                    logger.error(`[Analyzer] ${pair} Ticks are undefined!`);
+                    return resolve(false);
+                }
+
+                if (ticks.length == 0) {
+                    console.log(`[Analyzer] ${pair} Ticks array length is 0!`);
+                    logger.error(`[Analyzer] ${pair} Ticks array length is 0!`);
+                    return resolve(false);
+                }
+
+                //Calculate and check price change percent
+                for (const filter of this.options.pampAndDump.filters) {
+                    const firstTickOpen = ticks[ticks.length - 1][1];
+                    const lastTickClose = ticks[0][4];
+
+                    const priceChangePercent = Math.abs(((firstTickOpen - lastTickClose) / lastTickClose) * 100); 
+                    
+                    if (isNaN(priceChangePercent)) {
+                        console.log(`[Analyzer] ${pair} Tick price change percent is NAN!`);
+                        logger.error(`[Analyzer] ${pair} Tick price change percent is NAN!`);
+                        return resolve(false);
+                    }
+
+                    //Check price change precent for invalid condition
+                    if (priceChangePercent > filter.priceChange) {
+                        return resolve(false);
+                    }
+                }
+
+                resolve(true);
+            } catch (err) {
+                console.log(err);
+                logger.error(err)
+                resolve(false);
+            }
+        });
+    }
+
+    checkRSI(pair) {
+        return new Promise(async (resolve, reject) => {
+            for (const timeframe of this.options.rsi.timeframes) {
+                const ticks = await this.binance.candlesticks(pair, timeframe, false, { limit: this.options.rsi.length + 1 });
+
+                const closePrices = [];
+                for (const tick of ticks) {
+                    let [time, open, high, low, close, volume, closeTime, assetVolume, trades, buyBaseVolume, buyAssetVolume, ignored] = tick;
+                    closePrices.push(close);
+                }
+
+                const rsiCurrentValue = rsi.calculate(closePrices.reverse(), this.options.rsi.length, pair, timeframe);
+
+                // console.log('[Analyzer] RSI', pair, timeframe, rsiCurrentValue);
+                if (isNaN(rsiCurrentValue)) {
+                    console.log(`[Analyzer] ${pair} RSI is NAN!`);
+                    logger.error(`[Analyzer] ${pair} RSI is NAN!`);
+                    return resolve();
+                }
+
+                if (rsiCurrentValue > this.options.rsi.value) {
+                    return resolve(false);
+                }
+            }
+
+            resolve(true);
+        });
     }
 
     getLimit() {
@@ -156,30 +264,5 @@ module.exports = class Analyzer {
         }
 
         return limit;
-    }
-
-    checkRSI(pair) {
-        return new Promise(async (resolve, reject) => {
-            for (const timeframe of this.options.rsi.timeframes) {
-                const ticks = await this.binance.candlesticks(pair, timeframe, false, { limit: this.options.rsi.length + 1 });
-
-                const closePrices = [];
-                for (const tick of ticks) {
-                    let [time, open, high, low, close, volume, closeTime, assetVolume, trades, buyBaseVolume, buyAssetVolume, ignored] = tick;
-                    closePrices.push(close);
-                }
-
-                const rsiCurrentValue = rsi.calculate(closePrices.reverse(), this.options.rsi.length, pair, timeframe);
-
-                console.log('[Analyzer] RSI', pair, timeframe, rsiCurrentValue);
-
-                if (rsiCurrentValue > this.options.rsi.value) {
-                    resolve(false);
-                    break;
-                }
-            }
-
-            resolve(true);
-        });
     }
 }

@@ -5,6 +5,7 @@ const { connectDB } = require('./loaders/connectionDB.loader');
 const router = require('./router/index');
 const botmanagerService = require('./services/botmanager.service');
 const socketService = require('./services/socket.service');
+const { logger } = require('./utils/logger/logger');
 const analyzerService = (require('./services/analyzer.service')).getInstance();
 
 const PORT = process.env.PORT || 5000;
@@ -28,6 +29,7 @@ const start = async () => {
         socketService.connect();
     } catch (err) {
         console.log(err);
+        logger.error(err);
     }
 }
 
