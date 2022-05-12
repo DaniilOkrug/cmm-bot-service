@@ -27,6 +27,7 @@ class ApiService {
                     try {
                         const response = await binance.marketBuy("ETHUSDT", 1);
                     } catch (err) {
+                        console.log(err);
                         const response = {
                             status: false
                         }
@@ -37,7 +38,7 @@ class ApiService {
                             }
                         }
 
-                        resolve(response);
+                        return resolve(response);
                     }
                     break;
                 case 'Binance Futures':
@@ -46,7 +47,7 @@ class ApiService {
 
                         if (response.code) {
                             if (response.code == -2014) {
-                                resolve({
+                                return resolve({
                                     status: false,
                                     message: 'API ключи неверные'
                                 })
@@ -63,7 +64,7 @@ class ApiService {
                             }
                         }
 
-                        resolve(response);
+                        return resolve(response);
                     }
                     break;
                 default:

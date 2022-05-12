@@ -41,6 +41,21 @@ class BotController {
         }
     }
 
+    async stopAll(req, res, next) {
+        try {
+            const botIds = req.body;
+
+            const response = await botService.stopAll(botIds);
+
+            console.log('response', response);
+
+            res.json(response);
+        } catch (err) {
+            console.log(err);
+            next(err);
+        }
+    }
+
     async check(req, res, next) {
         try {
             const { key, secret, exchange } = req.body;

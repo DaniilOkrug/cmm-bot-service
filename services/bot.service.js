@@ -34,9 +34,21 @@ class BotService {
         const userBotData = await userBotModel.findById(botId);
         const apiData = await apiModel.findById(userBotData.api);
 
-        botManager.stopBot(apiData.key, apiData.secret, botId);
+        const botStatus = await botManager.stopBot(apiData.key, apiData.secret, botId)
 
-        return { status: "Stopping" }
+        return { status: botStatus };
+    }
+
+    async stopAll(botIds) {
+        console.log(botIds);
+        for (const botId of botIds) {
+            const userBotData = await userBotModel.findById(botId);
+            const apiData = await apiModel.findById(userBotData.api);
+
+            await botManager.stopBot(apiData.key, apiData.secret, botId)
+        }
+
+        return {};
     }
 
     async delete(botId) {

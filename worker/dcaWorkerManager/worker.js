@@ -284,11 +284,18 @@ channelOrders.onmessage = async (data) => {
             }
         }, 60000);
     } catch (err) {
-        if (err.body) {
-            console.log(Object.keys(err));
-        } else {
-            console.error(err);
-        }
+        console.log(err.message);
+
+        await botsChannel.postMessage(JSON.stringify({
+            type: "ERROR",
+            bot: {
+                botId: workerData.botId,
+                error: err.message
+            }
+        })).then(() => {
+            parentPort.postMessage({ type: 'TERMINATE' });
+            parentPort.close();
+        });
     }
 })();
 

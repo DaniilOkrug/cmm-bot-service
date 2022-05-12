@@ -82,7 +82,7 @@ class BotManager {
             try {
                 const workerInfo = this.#workers.find(workerInfo => key === workerInfo.key && secret === workerInfo.secret);
 
-                if (typeof workerInfo === 'undefined') reject(new Error("Bot Manager worker undefined"));
+                if (typeof workerInfo === 'undefined') return resolve();
 
                 workerInfo.worker.postMessage({
                     botId,
@@ -101,14 +101,14 @@ class BotManager {
             try {
                 const workerInfo = this.#workers.find(workerInfo => key === workerInfo.key && secret === workerInfo.secret);
 
-                if (typeof workerInfo === 'undefined') reject(new Error("Bot Manager worker undefined"));
+                if (typeof workerInfo === 'undefined') return resolve('Disabled');
 
                 workerInfo.worker.postMessage({
                     botId,
                     type: "STOP"
                 });
 
-                resolve()
+                resolve('Stopping');
             } catch (err) {
                 reject(err);
             }

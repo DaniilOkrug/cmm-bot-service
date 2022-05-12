@@ -156,7 +156,7 @@ class DcaBot {
 
                 resolve(grid);
             } catch (err) {
-                reject(new Error('calculateGrid | ' + err));
+                reject(new Error(err));
             }
         });
     }
@@ -172,6 +172,8 @@ class DcaBot {
                         const binanceResponse = await this.binance.order('BUY', grid.symbol, volume, price, {
                             type: 'LIMIT'
                         });
+
+                        console.log(binanceResponse);
 
                         if (typeof this.orders.grid === 'undefined') {
                             this.orders = {
@@ -228,7 +230,7 @@ class DcaBot {
 
                 resolve(volumes);
             } catch (err) {
-                reject(new Error('getGridVolumes | ' + err));
+                reject(new Error(err));
             }
         });
     }
@@ -272,7 +274,7 @@ class DcaBot {
 
                 resolve(gridPrices);
             } catch (err) {
-                reject(new Error('getGridPrices | ' + err));
+                reject(new Error(err));
             }
         });
     }
@@ -521,6 +523,7 @@ class DcaBot {
                 const priceFilter = this.pairsInfo.filters.find((filter) => filter.filterType === 'MIN_NOTIONAL');
 
                 if (value < priceFilter.minNotional) {
+                    console.log(value, priceFilter.minNotional);
                     reject(new Error(`[${this.options.pair}] Notional value less than Binance required!`));
                 }
 

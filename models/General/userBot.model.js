@@ -6,6 +6,7 @@ const UserBotShema = new Schema({
     bot: { type: Schema.Types.ObjectId, red: 'Bot' },
     pair: { type: String, required: true },
     status: { type: String, default: "Disabled" },
+    error: { type: String, default: '-'},
     deposit: { type: Number, required: true },
 });
 

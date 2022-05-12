@@ -163,33 +163,53 @@ botsChannel.onmessage = async (data) => {
         if (index > -1) activeBots.splice(index, 1);
 
         //Check for disabling bot
-        if (closeInfo.type === "DELETE") {
-            parentPort.postMessage({
-                type: "BOT_STATUS_UPDATE",
-                data: {
-                    botId: closeInfo.bot.botId,
-                    status: "Disabled"
-                }
-            });
+        switch (closeInfo.type) {
+            case 'DELETE':
+                parentPort.postMessage({
+                    type: "BOT_STATUS_UPDATE",
+                    data: {
+                        botId: closeInfo.bot.botId,
+                        status: "Disabled"
+                    }
+                });
 
-            //If no active and available bots then terminate Bot manager worker 
-            if (activeBots.length === 0 && availableBots.length === 0) {
-                parentPort.postMessage({ type: "TERMINATE" });
-                parentPort.close();
-            }
-        } else {
-            availableBots.push({
-                botId: closeInfo.bot.botId,
-                deposit: closeInfo.bot.deposit
-            });
-
-            parentPort.postMessage({
-                type: "BOT_STATUS_UPDATE",
-                data: {
-                    botId: closeInfo.bot.botId,
-                    status: "Wait"
+                //If no active and available bots then terminate Bot manager worker 
+                if (activeBots.length === 0 && availableBots.length === 0) {
+                    parentPort.postMessage({ type: "TERMINATE" });
+                    parentPort.close();
                 }
-            });
+                break;
+        
+            case 'ERROR':
+                parentPort.postMessage({
+                    type: "BOT_STATUS_UPDATE",
+                    data: {
+                        botId: closeInfo.bot.botId,
+                        status: "Error",
+                        error: closeInfo.bot.error
+                    }
+                });
+
+                //If no active and available bots then terminate Bot manager worker 
+                if (activeBots.length === 0 && availableBots.length === 0) {
+                    parentPort.postMessage({ type: "TERMINATE" });
+                    parentPort.close();
+                }
+                break;
+            default:
+                availableBots.push({
+                    botId: closeInfo.bot.botId,
+                    deposit: closeInfo.bot.deposit
+                });
+
+                parentPort.postMessage({
+                    type: "BOT_STATUS_UPDATE",
+                    data: {
+                        botId: closeInfo.bot.botId,
+                        status: "Wait"
+                    }
+                });
+                break;
         }
 
         console.log('Available Bots: ', availableBots);
