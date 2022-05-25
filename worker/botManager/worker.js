@@ -16,93 +16,121 @@ let activeBots = []; //Contain information about free user bots
 
 //Get message with task
 parentPort.on("message", async botTask => {
-    switch (botTask.type) {
-        case "ADD":
-            console.log("New free bot");
-            availableBots.push({
-                botId: botTask.botId,
-                deposit: botTask.deposit
-            });
+    try {
+        switch (botTask.type) {
+            case "ADD":
+                console.log("New free bot");
 
-            console.log(availableBots);
-            console.log(activeBots);
+                const availableBot = availableBots.find(data => data.botId === botTask.botId);
+                const activeBot = activeBots.find(data => data.botId === botTask.botId);
 
-            break;
+                if (!availableBot && !activeBot) {
+                    availableBots.push({
+                        botId: botTask.botId,
+                        deposit: botTask.deposit
+                    });
+                }
 
-        case "DELETE":
-            console.log("Delete dca bot by manager");
+                console.log(availableBots);
+                console.log(activeBots);
 
-            //Bot is availbale and waits signals
-            const availableBotData = availableBots.find(botInfo => botInfo.botId === botTask.botId);
-            if (typeof availableBotData !== 'undefined') {
-                const index = availableBots.indexOf(availableBotData);
-                if (index > -1) availableBots.splice(index, 1);
+                break;
 
-                parentPort.postMessage({
-                    type: "BOT_STATUS_UPDATE",
-                    data: {
-                        botId: availableBotData.botId,
-                        status: "Disabled"
-                    }
-                });
-            }
+            case "DELETE":
+                console.log("Delete dca bot by manager");
 
-            //Bot is active
-            const activeBotData = activeBots.find(botInfo => botInfo.botId === botTask.botId);
-            if (typeof activeBotData !== 'undefined') {
-                await dcaWorkerManager.deleteWorker(botTask.botId);
-            }
+                //Bot is availbale and waits signals.
+                const availableBotData = availableBots.find(botInfo => botInfo.botId === botTask.botId);
+                if (typeof availableBotData !== 'undefined') {
+                    const index = availableBots.indexOf(availableBotData);
+                    if (index > -1) availableBots.splice(index, 1);
 
-            console.log('Available Bots: ', availableBots);
-            console.log('Active bots: ', activeBots);
+                    parentPort.postMessage({
+                        type: "BOT_STATUS_UPDATE",
+                        data: {
+                            botId: availableBotData.botId,
+                            status: "Disabled"
+                        }
+                    });
+                }
 
-            //Bot manager doen't has bots
-            if (activeBots.length === 0 && availableBots.length === 0) {
-                parentPort.postMessage({ type: "TERMINATE" });
-                parentPort.close();
-            }
+                //Bot is active. Send signal for finishing work to the bot.
+                const activeBotData = activeBots.find(botInfo => botInfo.botId === botTask.botId);
+                console.log('activeBotData', activeBotData);
+                if (typeof activeBotData !== 'undefined') {
+                    await dcaWorkerManager.deleteWorker(botTask.botId);
+                }
 
-            break;
+                console.log('Available Bots: ', availableBots);
+                console.log('Active bots: ', activeBots);
 
-        case "STOP":
-            const botData = dcaWorkerManager.getWorker(botTask.botId);
-
-            //if bot is free and waits signals, then delete
-            if (typeof botData === 'undefined') {
-                const bot = availableBots.find(info => info.botId === botTask.botId);
-                const index = availableBots.indexOf(bot);
-                if (index > -1) availableBots.splice(index, 1);
-
-                parentPort.postMessage({
-                    type: "BOT_STATUS_UPDATE",
-                    data: {
-                        botId: bot.botId,
-                        status: "Disabled"
-                    }   
-                });
-
-                if (activeBots.length === 0 && availableBots.length === 0) {                    
+                //Bot manager doen't has bots
+                if (activeBots.length === 0 && availableBots.length === 0) {
                     parentPort.postMessage({ type: "TERMINATE" });
                     parentPort.close();
                 }
-            } else { //Stop if bot is active
-                await dcaWorkerManager.stopWorker(botTask.botId);
-            }
 
-            break;
+                break;
 
-        case "RESUME":
+            case "STOP":
+                const botData = dcaWorkerManager.getWorker(botTask.botId);
 
-            break;
+                //if bot is free and waits signals, then delete
+                if (typeof botData === 'undefined') {
+                    const bot = availableBots.find(info => info.botId === botTask.botId);
+                    const index = availableBots.indexOf(bot);
+                    if (index > -1) availableBots.splice(index, 1);
+
+                    parentPort.postMessage({
+                        type: "BOT_STATUS_UPDATE",
+                        data: {
+                            botId: bot.botId,
+                            status: "Disabled"
+                        }
+                    });
+
+                    if (activeBots.length === 0 && availableBots.length === 0) {
+                        parentPort.postMessage({ type: "TERMINATE" });
+                        parentPort.close();
+                    }
+                } else { //Stop if bot is active
+                    await dcaWorkerManager.stopWorker(botTask.botId);
+                }
+
+                break;
+
+            case "RESUME":
+
+                break;
+
+            case "UPDATE_SETTINGS":
+                botSettings = JSON.parse(botTask.settings);
+                console.log('[Worker] Bot settings updated!');
+                break;
+
+            default:
+                console.log("Unknown command");
+                break;
+        }
+    } catch (err) {
+        console.error(err);
+        logger.error(err);
         
-        case "UPDATE_SETTINGS":
-            botSettings = JSON.parse(botTask.settings);
-            console.log('[Worker] Bot settings updated!');
-            break;
+        logger.info('Deleting workers during of error')
 
-        default:
-            console.log("Unknown command");
-            break;
+        try {
+            availableBots.length = 0;
+            
+            for (const activeBot of activeBots) {
+                await dcaWorkerManager.deleteWorker(activeBot.botId);
+            }
+        } catch (err) {
+            console.error(err);
+            logger.error(err);
+        }
+
+        parentPort.postMessage({ type: "TERMINATE" });
+        parentPort.close();
     }
 });
 
@@ -118,7 +146,7 @@ channelSignal.onmessage = async (pair) => {
         //No available bots
         const freeBot = availableBots.shift();
         if (typeof freeBot === 'undefined') return;
-        
+
         logger.info("Start bot with pair: " + pair + ' ' + freeBot.botId);
 
         activeBots.push({
@@ -179,7 +207,7 @@ botsChannel.onmessage = async (data) => {
                     parentPort.close();
                 }
                 break;
-        
+
             case 'ERROR':
                 parentPort.postMessage({
                     type: "BOT_STATUS_UPDATE",

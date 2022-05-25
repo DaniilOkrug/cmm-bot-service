@@ -22,6 +22,7 @@ const BotShema = new Schema({
         grid: {
             size: { type: Number, required: true },
             ordersNumber: { type: Number, required: true },
+            distribution: { type: String, required: true },
             martingeil: { type: Number, required: true },
             indentFirstOrder: { type: Number, required: true },
             profit: { type: Number, required: true },
@@ -29,6 +30,7 @@ const BotShema = new Schema({
             priceFollowDelay: { type: Number, required: true }, //minutes
             newGridDelay: { type: Number, required: true },
             endCycleDelay: { type: Number, required: true },
+            logFactor: { type: Number, required: true }
         }
     },
 });

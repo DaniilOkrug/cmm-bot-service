@@ -20,14 +20,14 @@ module.exports = class Analyzer {
                 //Analyze intervals for price changes
                 if (this.options.minPriceChangeNumber > 0) {
                     const limit = this.getLimit();
-                    console.log(limit);
+                    
                     const priceChangeSignal = await this.checkPriceChanges(limit, pair);
                     if (!priceChangeSignal) {
                         console.log(`[Analyzer] ${pair} price changes is bad!`);
                         return resolve(false);
                     }
 
-                    console.log(`[Analyzer] ${pair} price changes is good!`);
+                    // console.log(`[Analyzer] ${pair} price changes is good!`);
                 }
                 
                 //Analyze volumes
@@ -38,7 +38,7 @@ module.exports = class Analyzer {
                         return resolve(false);
                     }
 
-                    console.log(`[Analyzer] ${pair} volume is good!`);
+                    // console.log(`[Analyzer] ${pair} volume is good!`);
                 }
 
                 //Ananlyze RSI
@@ -49,7 +49,7 @@ module.exports = class Analyzer {
                         return resolve(false);
                     }
 
-                    console.log(`[Analyzer] ${pair} RSI is good!`);
+                    // console.log(`[Analyzer] ${pair} RSI is good!`);
                 }
 
                 //Analyze pump and dump
@@ -61,7 +61,7 @@ module.exports = class Analyzer {
                         return resolve(false);
                     }
 
-                    console.log(`[Analyzer] ${pair} Pump and Dump is good!`);
+                    // console.log(`[Analyzer] ${pair} Pump and Dump is good!`);
                 }
 
                 resolve(true);
@@ -97,7 +97,7 @@ module.exports = class Analyzer {
                 const ticks = await this.binance.candlesticks(pair, this.options.interval, false, { limit: limit });
                 const priceChanges = await this.calculatePriceChanges(ticks);
 
-                console.log('Price changes: ' + priceChanges);
+                // console.log('Price changes: ' + priceChanges);
 
                 //Check price
                 if (priceChanges >= this.options.minPriceChangeNumber) {

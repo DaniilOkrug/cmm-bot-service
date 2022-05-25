@@ -58,7 +58,8 @@ class DcaWorkerManager {
     deleteWorker(botId) {
         return new Promise((resolve, reject) => {
             const workerInfo = this.#workers.find(data => data.botId === botId);
-            if (typeof workerInfo === 'undefined') return;
+
+            if (typeof workerInfo === 'undefined') return resolve();
 
             workerInfo.worker.postMessage({
                 type: 'DELETE'
@@ -76,7 +77,7 @@ class DcaWorkerManager {
     stopWorker(botId) {
         return new Promise((resolve, reject) => {
             const workerInfo = this.#workers.find(data => data.botId == botId);
-            if (typeof workerInfo === 'undefined') return;
+            if (typeof workerInfo === 'undefined') return resolve();
 
             workerInfo.worker.postMessage({
                 type: 'STOP'

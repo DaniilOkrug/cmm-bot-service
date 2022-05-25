@@ -1,4 +1,3 @@
-const { Error } = require('mongoose');
 const Binance = require('node-binance-api');
 
 const defaultOptions = {
@@ -17,6 +16,7 @@ const defaultOptions = {
     grid: {
         size: 5,
         ordersNumber: 20,
+        distribution: 'linear', //linear/logarithmic
         martingeil: 3,
         indentFirstOrder: 1,
         profit: 0.5,
@@ -24,6 +24,7 @@ const defaultOptions = {
         priceFollowDelay: 1, //minutes
         newGridDelay: 0,
         endCycleDelay: 0,
+        logFactor: 1 // for logarithmic distribution
     },
     mongodb: {
         enabled: false,
@@ -247,29 +248,72 @@ class DcaBot {
 
                 const firstOrderPrice = symbolPrice * indentMultiplier;
 
-                let gridPrices = [await this.filterPrice(symbol, firstOrderPrice)];
+                let gridPrices = [await this.filterPrice(firstOrderPrice)];
+
+                if (this.#options.grid.ordersNumber === 1) return resolve(gridPrices);
 
                 let step = 0.0;
+                let lastOrderPrice;
                 if (this.#options.algorithm === 'long') {
-                    const lastOrderPrice = firstOrderPrice * (1 - this.#options.grid.size / 100);
+                    lastOrderPrice = firstOrderPrice * (1 - this.#options.grid.size / 100);
                     step = (firstOrderPrice - lastOrderPrice) / this.#options.grid.ordersNumber;
                 } else {
-                    const lastOrderPrice = firstOrderPrice * (1 + this.#options.grid.size / 100);
+                    lastOrderPrice = firstOrderPrice * (1 + this.#options.grid.size / 100);
                     step = (lastOrderPrice - firstOrderPrice) / this.#options.grid.ordersNumber;
                 }
 
-                for (let i = 0; i < this.#options.grid.ordersNumber - 1; i++) {
-                    switch (this.#options.algorithm) {
-                        case 'long':
-                            gridPrices.push(await this.filterPrice(symbol, gridPrices[i] - step));
-                            break;
-                        case 'short':
-                            gridPrices.push(await this.filterPrice(symbol, gridPrices[i] + step));
-                            break;
-                        default:
-                            reject(new Error('Wrong algorithm!'));
-                            break;
-                    }
+                if (this.#options.grid.ordersNumber === 2) {
+                    gridPrices.push(await this.filterPrice(lastOrderPrice));
+                    return resolve(gridPrices);
+                }
+
+                switch (this.#options.grid.distribution) {
+                    case 'linear':
+                        //Array already has first prise
+                        for (let i = 0; i < this.#options.grid.ordersNumber - 1; i++) {
+                            switch (this.#options.algorithm) {
+                                case 'long':
+                                    gridPrices.push(await this.filterPrice(gridPrices[i] - step));
+                                    break;
+                                default:
+                                    reject(new Error('Wrong algorithm!'));
+                                    break;
+                            }
+                        }
+                        break;
+                
+                    case 'logarithmic':
+                        for (let i = 0; i < this.#options.grid.ordersNumber - 1; i++) {
+                            switch (this.#options.algorithm) {
+                                case 'long':
+                                    gridPrices.push(gridPrices[i] - step);
+                                    break;
+                                default:
+                                    reject(new Error('Wrong algorithm!'));
+                                    break;
+                            }
+                        }
+                        
+                        for (let i = 1; i < this.#options.grid.ordersNumber - 1; i++) {
+                            switch (this.#options.algorithm) {
+                                case 'long':
+                                    const newDistance = (gridPrices[i - 1] - gridPrices[i]) / this.#options.grid.logFactor;
+                                    gridPrices[i] = await this.filterPrice(gridPrices[i - 1] - newDistance);
+                                    break;
+                                default:
+                                    reject(new Error('Wrong algorithm!'));
+                                    break;
+                            }
+                        }
+
+                        //Filter last price
+                        gridPrices[gridPrices.length - 1] = await this.filterPrice(gridPrices[gridPrices.length - 1]);
+                        
+                        break;
+
+                    default:
+                        reject(new Error('Wrong distribution'))
+                        break;
                 }
 
                 resolve(gridPrices);
@@ -320,7 +364,7 @@ class DcaBot {
 
                 const priceMultiplier = this.#options.grid.profit / 100 + 1;
 
-                const price = await this.filterPrice(symbol, (await this.calculateAverageFilledPrice(symbol)) * priceMultiplier);
+                const price = await this.filterPrice((await this.calculateAverageFilledPrice(symbol)) * priceMultiplier);
                 const volume = await this.filterLotSize(symbol, await this.calculateFilledVolume(symbol));
 
                 if (this.#options.verbose) console.log(`[${this.options.pair}] Place takeprofit order. Price: ${price} Volume: ${volume}`);
@@ -485,9 +529,11 @@ class DcaBot {
         });
     }
 
-    filterPrice(symbol, price) {
+    filterPrice(price) {
         return new Promise((resolve, reject) => {
             try {
+                if (typeof price === 'undefined') return reject(new Error('Price in checking filter undefined!'));
+
                 const priceFilter = this.pairsInfo.filters.find((filter) => filter.filterType === 'PRICE_FILTER');
 
                 if (price < priceFilter.minPrice) {

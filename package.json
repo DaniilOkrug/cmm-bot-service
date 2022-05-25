@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node --trace-warnings index.js",
-    "dev": "nodemon index.js --trace-warnings",
+    "dev": "nodemon --trace-warnings index.js",
     "test": "mocha"
   },
   "author": "",

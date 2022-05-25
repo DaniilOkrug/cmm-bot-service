@@ -1,7 +1,7 @@
 const { Worker } = require("worker_threads");
 const { BroadcastChannel } = require('broadcast-channel');
 const socketService = require("../../services/socket.service");
-const { logger } = require("winston");
+const { logger } = require("../../utils/logger/logger");
 
 class BotManager {
     #workers = [];
@@ -54,6 +54,8 @@ class BotManager {
 
                 resolve(worker);
             } catch (err) {
+                console.error(err);
+                logger.error(err);
                 reject(err);
             }
         });
@@ -72,6 +74,8 @@ class BotManager {
 
                 resolve()
             } catch (err) {
+                console.error(err);
+                logger.error(err);
                 reject(err);
             }
         });
@@ -91,6 +95,8 @@ class BotManager {
 
                 resolve()
             } catch (err) {
+                console.error(err);
+                logger.error(err);
                 reject(err);
             }
         });
@@ -110,6 +116,8 @@ class BotManager {
 
                 resolve('Stopping');
             } catch (err) {
+                console.error(err);
+                logger.error(err);
                 reject(err);
             }
         });
@@ -127,7 +135,8 @@ class BotManager {
                 });
                 resolve();
             } catch (err) {
-                console.log(err);
+                console.error(err);
+                logger.error(err);
                 reject(err);
             }
         });
