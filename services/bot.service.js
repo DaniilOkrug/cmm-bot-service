@@ -1,10 +1,15 @@
-const apiWorkerManager = require('../worker/apiWorkerManager/index');
-const analyzerService = (require('./analyzer.service')).getInstance();
 const userBotModel = require('../models/General/userBot.model');
 const botModel = require('../models/General/bot.model');
 const apiModel = require('../models/General/api.model');
+
+const apiWorkerManager = require('../worker/apiWorkerManager/index');
+const analyzerService = (require('./analyzer.service')).getInstance();
 const botManager = require('../worker/botManager');
-const { logger } = require('../utils/logger/logger');
+const proxyService = (require('./proxy.service')).getInstance();
+
+const ApiError = require('../exceptions/api.error');
+
+const { logger } = require('../utils/logger/logger')
 
 class BotService {
     async start(botId) {
@@ -19,11 +24,14 @@ class BotService {
             await apiWorkerManager.createWorker(apiData.key, apiData.secret);
         }
 
+        const proxy = await proxyService.setBotProxy(botId);
+        if (typeof proxy === 'undefined') return new ApiError.BadRequest('Proxy error');
+
         if (!isBotManagerExists) {
             await botManager.createWorker(apiData.key, apiData.secret, botData.settings);
         }
 
-        await botManager.addBot(apiData.key, apiData.secret, botId, userBotData.deposit);
+        await botManager.addBot(apiData.key, apiData.secret, botId, userBotData.deposit, proxy);
 
         return {
             status: 'Wait'
@@ -85,7 +93,7 @@ class BotService {
 
     async updateBlacklist() {
         const botData = (await botModel.find())[0];
-        
+
         analyzerService.updateBlacklist(botData._doc.blacklist);
 
         return { status: "Updated" };

@@ -43,7 +43,8 @@ parentPort.on('message', async data => {
                     type: "DELETE",
                     bot: {
                         botId: workerData.botId,
-                        deposit: workerData.deposit
+                        deposit: workerData.deposit,
+                        proxy: workerData.proxy
                     }
                 })).then(() => {
                     parentPort.postMessage({ type: 'TERMINATE' });
@@ -71,7 +72,8 @@ parentPort.on('message', async data => {
                         type: "DELETE",
                         bot: {
                             botId: workerData.botId,
-                            deposit: workerData.deposit
+                            deposit: workerData.deposit,
+                            proxy: workerData.proxy
                         }
                     }));
 
@@ -243,7 +245,8 @@ channelOrders.onmessage = async (data) => {
                         type: "READY",
                         bot: {
                             botId: workerData.botId,
-                            deposit: workerData.deposit
+                            deposit: workerData.deposit,
+                            proxy: workerData.proxy
                         }
                     })).then(() => {
                         parentPort.postMessage({ type: 'TERMINATE' });
@@ -271,7 +274,8 @@ channelOrders.onmessage = async (data) => {
 
         const grid = await bot.calculateGrid();
 
-        await bot.startCycle(grid);
+        const response = await bot.startCycle(grid);
+        if (typeof response !== 'undefined') throw response;
 
         console.log(grid);
 
@@ -279,9 +283,7 @@ channelOrders.onmessage = async (data) => {
 
         setInterval(() => {
             const weigth = bot.getUsedWeight(); 
-            if (weigth > 900) {
-                console.log("Used API Weight: " + weigth);
-            }
+            console.log("Used API Weight: " + weigth);
         }, 60000);
     } catch (err) {
         console.log(err.message);

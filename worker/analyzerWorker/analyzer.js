@@ -12,10 +12,26 @@ module.exports = class Analyzer {
     getSignal(pair) {
         return new Promise(async (resolve, reject) => {
             try {
-                this.binance = new Binance().options({
-                    useServerTime: true,
-                    recvWindow: 60000,
-                });
+                if (this.options.proxy) {
+                    this.binance = new Binance().options({
+                        useServerTime: true,
+                        recvWindow: 60000,
+                        proxy: {
+                            host: this.options.proxy.address,
+                            port: this.options.proxy.portHTTP,
+                            auth: {
+                                username: this.options.proxy.username,
+                                password: this.options.proxy.password
+                            }
+                        }
+                    });
+                } else {
+                    console.warn('No proxy for analayzer!');
+                    this.binance = new Binance().options({
+                        useServerTime: true,
+                        recvWindow: 60000,
+                    });
+                }
 
                 //Analyze intervals for price changes
                 if (this.options.minPriceChangeNumber > 0) {

@@ -82,6 +82,14 @@ class DcaBot {
                 APISECRET: this.#options.secret,
                 useServerTime: true,
                 recvWindow: 60000,
+                proxy: {
+                    host: this.#options.proxy.address,
+                    port: this.#options.proxy.portHTTP,
+                    auth: {
+                        username: this.#options.proxy.username,
+                        password: this.#options.proxy.password
+                    }
+                }
             });
         } catch (err) {
             console.error(err);

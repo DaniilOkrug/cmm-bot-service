@@ -27,7 +27,8 @@ parentPort.on("message", async botTask => {
                 if (!availableBot && !activeBot) {
                     availableBots.push({
                         botId: botTask.botId,
-                        deposit: botTask.deposit
+                        deposit: botTask.deposit,
+                        proxyData: botTask.proxyData
                     });
                 }
 
@@ -154,9 +155,12 @@ channelSignal.onmessage = async (pair) => {
             ...freeBot
         });
 
+        console.log(freeBot.proxyData);
+
         const settings = {
             pair,
             deposit: freeBot.deposit,
+            proxy: freeBot.proxyData,
             ...botSettings
         }
         await dcaWorkerManager.createWorker(freeBot.botId, dataWorker.key, dataWorker.secret, settings);
@@ -227,7 +231,8 @@ botsChannel.onmessage = async (data) => {
             default:
                 availableBots.push({
                     botId: closeInfo.bot.botId,
-                    deposit: closeInfo.bot.deposit
+                    deposit: closeInfo.bot.deposit,
+                    proxyData: closeInfo.bot.proxy
                 });
 
                 parentPort.postMessage({

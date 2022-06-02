@@ -4,15 +4,18 @@ const botModel = require('../models/General/bot.model');
 class AnalyzerService {
     #worker;
 
-    createWorker() {
+    createWorker(proxy = false) {
         return new Promise(async (resolve, reject) => {
             const botSettings = (await botModel.find())[0];
-
 
             const analyzerSettigs = JSON.parse(JSON.stringify(botSettings.settings.analyzer));
             analyzerSettigs.algorithm = botSettings._doc.settings.algorithm;
             analyzerSettigs.pairs = botSettings._doc.pairs;
             analyzerSettigs.blacklist = botSettings._doc.blacklist;
+
+            if (proxy) {
+                analyzerSettigs.proxy = proxy;
+            }
 
             const worker = new Worker("./worker/analyzerWorker/worker.js", {
                 workerData: JSON.stringify(analyzerSettigs)

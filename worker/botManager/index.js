@@ -1,6 +1,9 @@
 const { Worker } = require("worker_threads");
 const { BroadcastChannel } = require('broadcast-channel');
+
 const socketService = require("../../services/socket.service");
+const proxyService = (require("../../services/proxy.service")).getInstance();
+
 const { logger } = require("../../utils/logger/logger");
 
 class BotManager {
@@ -27,6 +30,11 @@ class BotManager {
                             break;
                         case "BOT_STATUS_UPDATE":
                             console.log("BOT_STATUS_UPDATE", task.data);
+
+                            if (task.data.status === 'Disabled' || task.data.status === 'Error') { 
+                                proxyService.job.deleteBotProxy(task.data.botId);
+                            }
+
                             socketService.sendBotUpdate(task.data);
                             break;
                         default:
@@ -61,7 +69,7 @@ class BotManager {
         });
     }
 
-    addBot(key, secret, botId, deposit) {
+    addBot(key, secret, botId, deposit, proxyData) {
         return new Promise((resolve, reject) => {
             try {
                 const workerInfo = this.#workers.find(workerInfo => key === workerInfo.key && secret === workerInfo.secret);
@@ -69,6 +77,7 @@ class BotManager {
                 workerInfo.worker.postMessage({
                     botId,
                     deposit,
+                    proxyData,
                     type: "ADD"
                 });
 
